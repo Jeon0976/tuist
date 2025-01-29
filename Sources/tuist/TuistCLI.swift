@@ -1,6 +1,7 @@
 import FileSystem
 import Foundation
 import Path
+import Noora
 import ServiceContextModule
 import TSCBasic
 import TuistKit
@@ -32,6 +33,7 @@ private enum TuistCLI {
 
             var context = ServiceContext.topLevel
             context.logger = Logger(label: "dev.tuist.cli", factory: loggerHandler)
+            context.ui = Noora()
 
             try await ServiceContext.withValue(context) {
                 try await TuistCommand.main(logFilePath: logFilePath)
