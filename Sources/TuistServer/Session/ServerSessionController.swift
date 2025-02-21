@@ -133,7 +133,6 @@ public final class ServerSessionController: ServerSessionControlling {
             refreshToken: tokens.refreshToken
         )
         try await credentialsStore.store(credentials: credentials, serverURL: serverURL)
-        ServiceContext.current?.logger?.notice("Credentials stored successfully", metadata: .success)
     }
 
     public func whoami(serverURL: URL) async throws -> String? {

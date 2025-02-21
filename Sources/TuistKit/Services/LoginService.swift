@@ -12,8 +12,26 @@ protocol LoginServicing: AnyObject {
     func run(
         email: String?,
         password: String?,
-        directory: String?
+        directory: String?,
+        onEvent: @escaping (LoginServiceEvent) -> Void
     ) async throws
+}
+
+enum LoginServiceEvent: CustomStringConvertible {
+    case openingBrowser(URL)
+    case waitForAuthentication
+    case completed
+
+    var description: String {
+        switch self {
+        case let .openingBrowser(url):
+            "Opening \(url.absoluteString) to start the authentication flow"
+        case .waitForAuthentication:
+            "Press CTRL + C once to cancel the process."
+        case .completed:
+            "Successfully logged in."
+        }
+    }
 }
 
 final class LoginService: LoginServicing {
@@ -30,7 +48,8 @@ final class LoginService: LoginServicing {
         configLoader: ConfigLoading = ConfigLoader(warningController: WarningController.shared),
         userInputReader: UserInputReading = UserInputReader(),
         authenticateService: AuthenticateServicing = AuthenticateService(),
-        serverCredentialsStore: ServerCredentialsStoring = ServerCredentialsStore()
+        serverCredentialsStore: ServerCredentialsStoring = ServerCredentialsStore(),
+        onEvent _: @escaping (LoginServiceEvent) -> Void = { ServiceContext.current?.logger?.notice("\($0.description)") }
     ) {
         self.serverSessionController = serverSessionController
         self.serverURLService = serverURLService
@@ -45,7 +64,8 @@ final class LoginService: LoginServicing {
     func run(
         email: String?,
         password: String?,
-        directory: String?
+        directory: String?,
+        onEvent: @escaping (LoginServiceEvent) -> Void
     ) async throws {
         let directoryPath: AbsolutePath
         if let directory {
@@ -60,17 +80,19 @@ final class LoginService: LoginServicing {
             try await authenticateWithEmailAndPassword(
                 email: email,
                 password: password,
-                serverURL: serverURL
+                serverURL: serverURL,
+                onEvent: onEvent
             )
         } else {
-            try await authenticateWithBrowserLogin(serverURL: serverURL)
+            try await authenticateWithBrowserLogin(serverURL: serverURL, onEvent: onEvent)
         }
     }
 
     private func authenticateWithEmailAndPassword(
         email: String?,
         password: String?,
-        serverURL: URL
+        serverURL: URL,
+        onEvent: @escaping (LoginServiceEvent) -> Void
     ) async throws {
         let email = email ?? userInputReader.readString(asking: "Email:")
         let password = password ?? userInputReader.readString(asking: "Password:")
@@ -89,29 +111,34 @@ final class LoginService: LoginServicing {
             ),
             serverURL: serverURL
         )
-        ServiceContext.current?.logger?.notice("Successfully logged in.", metadata: .success)
+        onEvent(.completed)
     }
 
     private func authenticateWithBrowserLogin(
-        serverURL: URL
+        serverURL: URL,
+        onEvent: @escaping (LoginServiceEvent) -> Void
     ) async throws {
         try await serverSessionController.authenticate(
             serverURL: serverURL,
             deviceCodeType: .cli,
             onOpeningBrowser: { authURL in
-                ServiceContext.current?.logger?.notice("Opening \(authURL.absoluteString) to start the authentication flow")
+                onEvent(.openingBrowser(authURL))
             },
             onAuthWaitBegin: {
-                if Environment.shared.shouldOutputBeColoured {
-                    ServiceContext.current?.logger?.notice(
-                        "Press \("CTRL + C".cyan()) once to cancel the process.",
-                        metadata: .pretty
-                    )
-                } else {
-                    ServiceContext.current?.logger?.notice("Press CTRL + C once to cancel the process.")
-                }
+                onEvent(.waitForAuthentication)
             }
         )
-        ServiceContext.current?.logger?.notice("Successfully logged in.", metadata: .success)
+        onEvent(.completed)
+    }
+}
+
+extension LoginServicing {
+    func run(
+        email: String? = nil,
+        password: String? = nil,
+        directory: String? = nil,
+        onEvent: @escaping (LoginServiceEvent) -> Void = { ServiceContext.current?.logger?.notice("\($0.description)") }
+    ) async throws {
+        try await run(email: email, password: password, directory: directory, onEvent: onEvent)
     }
 }

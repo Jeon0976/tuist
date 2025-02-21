@@ -124,6 +124,7 @@ let targets: [Target] = [
             "Mockable",
             "FileSystem",
             "Command",
+            .product(name: "Noora", package: "noora"),
             .product(name: "LoggingOSLog", package: "swift-log-oslog"),
             .product(name: "FileLogging", package: "swift-log-file"),
             .product(name: "ServiceContextModule", package: "swift-service-context"),
@@ -544,8 +545,8 @@ let package = Package(
         ),
         .package(url: "https://github.com/crspybits/swift-log-file", .upToNextMajor(from: "0.1.0")),
         .package(
-            url: "https://github.com/tuist/Noora.git", exact: "0.17.0"
-        )
+            url: "https://github.com/tuist/Noora.git", .branch("make-progress-escaping")
+        ),
     ],
     targets: targets
 )
